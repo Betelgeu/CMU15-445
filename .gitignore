@@ -252,3 +252,6 @@ homework/*/*.db
 homework/*/*.duckdb
 homework/*/import.sql
 homework/*/create_sql.sh
+
+*.db
+*.log
