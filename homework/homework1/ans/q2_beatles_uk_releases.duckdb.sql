@@ -15,9 +15,12 @@ join
     artist_credit_name on artist_credit_name.artist_credit = artist_credit.id
 join
     artist on artist.id = artist_credit_name.artist
+join
+    area on area.id = release_info.area
 where
     artist.name = 'The Beatles'
     and medium_format.name = '12" Vinyl'
+    and area.name = 'United Kingdom'
     and cast(release_info.date_year || '-' || printf('%02d', release_info.date_month) || '-' || printf('%02d', release_info.date_day) as date) 
     <= cast(artist.end_date_year || '-' || printf('%02d', artist.end_date_month) || '-' || printf('%02d', artist.end_date_day) as date)
 group by
@@ -25,6 +28,4 @@ group by
     release_info.date_year
 order by
     min(release_info.date_year),
-    min(release_info.date_month),
-    min(release_info.date_day),
     release.name;

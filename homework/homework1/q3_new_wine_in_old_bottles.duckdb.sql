@@ -3,10 +3,10 @@ SELECT release.name as RELEASE_NAME,
     release_info.date_year AS RELEASE_YEAR
 FROM release
     JOIN (
-        SELECT id,
+        SELECT release,
             format
         from medium
-    ) as medium ON medium.id = release.id
+    ) as medium ON medium.release = release.id
     JOIN (
         SELECT id,
             name

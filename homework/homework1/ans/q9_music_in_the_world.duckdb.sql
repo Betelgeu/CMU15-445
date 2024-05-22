@@ -28,4 +28,4 @@ where
     (cast(r.num_releases_in_2010s as float) / t.total_releases_in_2010s) >
     (cast(r.num_releases_in_1950s as float) / t.total_releases_in_1950s)
 order by 
-    increase desc;
+    increase desc, r.language asc;

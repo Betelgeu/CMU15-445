@@ -16,4 +16,5 @@ FROM (
             JOIN work_type ON work_type.id = work.type
         WHERE COMMENT_LENGTH > 0
     )
-WHERE rank = 1;
+WHERE rank = 1
+order by WORK_TYPE, WORK_NAME;

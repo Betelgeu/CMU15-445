@@ -20,7 +20,7 @@ from (
                     JOIN artist ON artist.id = artist_credit_name.artist
                 WHERE artist.name = 'The Beatles'
                     AND medium_format.name = '12" Vinyl'
-                    AND area.name = 'United States'
+                    AND area.name = 'United Kingdom'
                     AND release_info.date_year < artist.end_date_year
             ) as t
     ) as s
