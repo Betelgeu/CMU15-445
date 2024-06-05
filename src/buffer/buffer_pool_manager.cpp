@@ -200,21 +200,27 @@ auto BufferPoolManager::AllocatePage() -> page_id_t { return next_page_id_++; }
 
 auto BufferPoolManager::FetchPageBasic(page_id_t page_id) -> BasicPageGuard {
   Page *page = FetchPage(page_id);
+  BUSTUB_ENSURE(page != nullptr, "FetchPage in FetchPageBasic returned nullptr");
   return {this, page};
 }
 
 auto BufferPoolManager::FetchPageRead(page_id_t page_id) -> ReadPageGuard {
   Page *page = FetchPage(page_id);
+  BUSTUB_ENSURE(page != nullptr, "FetchPage in FetchPageRead returned nullptr");
+  page->RLatch();
   return {this, page};
 }
 
 auto BufferPoolManager::FetchPageWrite(page_id_t page_id) -> WritePageGuard {
   Page *page = FetchPage(page_id);
+  BUSTUB_ENSURE(page != nullptr, "FetchPage in FetchPageWrite returned nullptr");
+  page->WLatch();
   return {this, page};
 }
 
 auto BufferPoolManager::NewPageGuarded(page_id_t *page_id) -> BasicPageGuard {
   Page *page = NewPage(page_id);
+  BUSTUB_ENSURE(page != nullptr, "NewPage in NewPageGuarded returned nullptr");
   return {this, page};
 }
 
