@@ -14,31 +14,39 @@
 
 namespace bustub {
 
-SeqScanExecutor::SeqScanExecutor(ExecutorContext *exec_ctx, const SeqScanPlanNode *plan) : AbstractExecutor(exec_ctx), plan_(plan) {}
+SeqScanExecutor::SeqScanExecutor(ExecutorContext *exec_ctx, const SeqScanPlanNode *plan)
+    : AbstractExecutor(exec_ctx), plan_(plan) {}
 
 void SeqScanExecutor::Init() {
-  // throw NotImplementedException("SeqScanExecutor is not implemented");
   auto table_id = plan_->GetTableOid();
-  auto table_heap = exec_ctx_->GetCatalog()->GetTable(table_id)->table_.get();
+  auto &table_heap = exec_ctx_->GetCatalog()->GetTable(table_id)->table_;
   table_iter_ = std::make_unique<TableIterator>(table_heap->MakeIterator());
 }
 
 auto SeqScanExecutor::Next(Tuple *tuple, RID *rid) -> bool {
-  if(table_iter_->IsEnd()) {
-    return false;
-  }
   // 到第一个有效tuple或者end
-  while(!table_iter_->IsEnd() && table_iter_->GetTuple().first.is_deleted_) {
-    ++(*table_iter_);
-  }
+  while(true) {
+    bool status = !table_iter_->IsEnd();
+    if(!status) {
+      return false;
+    }
 
-  if(!table_iter_->IsEnd()) {
-    *tuple = table_iter_->GetTuple().second;
-    *rid = table_iter_->GetRID();
+    auto [temp_meta, temp_tuple] = table_iter_->GetTuple();
+    auto temp_rid = table_iter_->GetRID();
+    status &= !temp_meta.is_deleted_;
+    // 可能做了谓词下推
+    if(plan_->filter_predicate_ != nullptr) {
+      auto value = plan_->filter_predicate_->Evaluate(&temp_tuple, plan_->OutputSchema());
+      status &= value.GetAs<bool>();
+    }
+
     ++(*table_iter_);
-    return true;
+    if(status) {
+      *tuple = temp_tuple;
+      *rid = temp_rid;
+      return true;
+    }
   }
-  return false;
 }
 
 }  // namespace bustub
