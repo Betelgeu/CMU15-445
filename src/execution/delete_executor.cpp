@@ -21,8 +21,8 @@ DeleteExecutor::DeleteExecutor(ExecutorContext *exec_ctx, const DeletePlanNode *
     : AbstractExecutor(exec_ctx), plan_(plan), child_executor_(std::move(child_executor)) {}
 
 void DeleteExecutor::Init() {
-    child_executor_->Init();
-    called_ = false;
+  child_executor_->Init();
+  called_ = false;
 }
 
 auto DeleteExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
@@ -31,17 +31,18 @@ auto DeleteExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
   int size = 0;
   Tuple temp_tuple;
   RID temp_rid;
-  while(child_executor_->Next(&temp_tuple, &temp_rid)) {
-      table->UpdateTupleMeta({0, true}, temp_rid);
-      size++;
+  while (child_executor_->Next(&temp_tuple, &temp_rid)) {
+    table->UpdateTupleMeta({0, true}, temp_rid);
+    size++;
 
-      //delete from index
-      auto table_name = table_info->name_;
-      auto index_info_vec = exec_ctx_->GetCatalog()->GetTableIndexes(table_name);
-      for(auto index_info : index_info_vec) {
-          auto key = temp_tuple.KeyFromTuple(table_info->schema_, index_info->key_schema_, index_info->index_->GetKeyAttrs());
-          index_info->index_->DeleteEntry(key, temp_rid, exec_ctx_->GetTransaction());
-      }
+    // delete from index
+    auto table_name = table_info->name_;
+    auto index_info_vec = exec_ctx_->GetCatalog()->GetTableIndexes(table_name);
+    for (auto index_info : index_info_vec) {
+      auto key =
+          temp_tuple.KeyFromTuple(table_info->schema_, index_info->key_schema_, index_info->index_->GetKeyAttrs());
+      index_info->index_->DeleteEntry(key, temp_rid, exec_ctx_->GetTransaction());
+    }
   }
 
   // output size tuple
@@ -49,7 +50,7 @@ auto DeleteExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
   values.emplace_back(INTEGER, size);
   *tuple = Tuple(values, &GetOutputSchema());
   // output once
-  if(!called_) {
+  if (!called_) {
     called_ = true;
     return true;
   }

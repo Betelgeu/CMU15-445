@@ -25,9 +25,9 @@ void SeqScanExecutor::Init() {
 
 auto SeqScanExecutor::Next(Tuple *tuple, RID *rid) -> bool {
   // 到第一个有效tuple或者end
-  while(true) {
+  while (true) {
     bool status = !table_iter_->IsEnd();
-    if(!status) {
+    if (!status) {
       return false;
     }
 
@@ -35,13 +35,13 @@ auto SeqScanExecutor::Next(Tuple *tuple, RID *rid) -> bool {
     auto temp_rid = table_iter_->GetRID();
     status &= !temp_meta.is_deleted_;
     // 可能做了谓词下推
-    if(plan_->filter_predicate_ != nullptr) {
+    if (plan_->filter_predicate_ != nullptr) {
       auto value = plan_->filter_predicate_->Evaluate(&temp_tuple, plan_->OutputSchema());
       status &= value.GetAs<bool>();
     }
 
     ++(*table_iter_);
-    if(status) {
+    if (status) {
       *tuple = temp_tuple;
       *rid = temp_rid;
       return true;

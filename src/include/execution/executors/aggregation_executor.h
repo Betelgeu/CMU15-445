@@ -71,13 +71,52 @@ class SimpleAggregationHashTable {
    * @param input The input value
    */
   void CombineAggregateValues(AggregateValue *result, const AggregateValue &input) {
+    // 输入当前的value
+    // 要求的将input的values加到result上
     for (uint32_t i = 0; i < agg_exprs_.size(); i++) {
+      auto &value = result->aggregates_[i];
+      auto &input_value = input.aggregates_[i];
+
+      // 不插入空值, 空值除了初始化，不能做任何改变操作
+      if(input_value.IsNull()) {
+        continue;
+      }
+
       switch (agg_types_[i]) {
         case AggregationType::CountStarAggregate:
+          value = value.Add(input_value);
+          break;
         case AggregationType::CountAggregate:
+          if(value.IsNull()) {
+            value = ValueFactory::GetIntegerValue(1);
+          }
+          else {
+            value = value.Add(ValueFactory::GetIntegerValue(1));
+          }
+          break;
         case AggregationType::SumAggregate:
+          if(value.IsNull()){
+            value = input_value;
+          }
+          else {
+            value = value.Add(input_value);
+          }
+          break;
         case AggregationType::MinAggregate:
+          if(value.IsNull()){
+            value = input_value;
+          }
+          else {
+            value = value.Min(input_value);
+          }
+          break;
         case AggregationType::MaxAggregate:
+          if(value.IsNull()) {
+            value = input_value;
+          }
+          else {
+            value = value.Max(input_value);
+          }
           break;
       }
     }
@@ -204,8 +243,10 @@ class AggregationExecutor : public AbstractExecutor {
 
   /** Simple aggregation hash table */
   // TODO(Student): Uncomment SimpleAggregationHashTable aht_;
+  SimpleAggregationHashTable aht_;
 
   /** Simple aggregation hash table iterator */
   // TODO(Student): Uncomment SimpleAggregationHashTable::Iterator aht_iterator_;
+  SimpleAggregationHashTable::Iterator aht_iterator_;
 };
 }  // namespace bustub
