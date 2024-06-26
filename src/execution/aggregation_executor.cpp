@@ -26,10 +26,11 @@ AggregationExecutor::AggregationExecutor(ExecutorContext *exec_ctx, const Aggreg
 
 void AggregationExecutor::Init() {
   child_executor_->Init();
+  aht_.Clear();
   Tuple tuple;
   RID rid;
   // int idx = 0;
-  while(child_executor_->Next(&tuple, &rid)){
+  while (child_executor_->Next(&tuple, &rid)) {
     // Get the key and value
     auto key = MakeAggregateKey(&tuple);
     auto value = MakeAggregateValue(&tuple);
@@ -37,12 +38,12 @@ void AggregationExecutor::Init() {
     aht_.InsertCombine(key, value);
   }
 
-  // 处理空表
-  if(aht_.Begin() == aht_.End()){
+  // 处理空表且没有group by的情况
+  if (aht_.Begin() == aht_.End() && plan_->GetGroupBys().empty()) {
     // 插入一个初始化<key, value>
     // key无所谓
     // value必须是GenerateInitialAggregateValue生成的初始值
-    auto key = MakeAggregateKey(&tuple);
+    AggregateKey key;
     auto value = aht_.GenerateInitialAggregateValue();
     aht_.InsertCombine(key, value);
   }

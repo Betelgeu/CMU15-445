@@ -78,7 +78,7 @@ class SimpleAggregationHashTable {
       auto &input_value = input.aggregates_[i];
 
       // 不插入空值, 空值除了初始化，不能做任何改变操作
-      if(input_value.IsNull()) {
+      if (input_value.IsNull()) {
         continue;
       }
 
@@ -87,34 +87,30 @@ class SimpleAggregationHashTable {
           value = value.Add(input_value);
           break;
         case AggregationType::CountAggregate:
-          if(value.IsNull()) {
+          if (value.IsNull()) {
             value = ValueFactory::GetIntegerValue(1);
-          }
-          else {
+          } else {
             value = value.Add(ValueFactory::GetIntegerValue(1));
           }
           break;
         case AggregationType::SumAggregate:
-          if(value.IsNull()){
+          if (value.IsNull()) {
             value = input_value;
-          }
-          else {
+          } else {
             value = value.Add(input_value);
           }
           break;
         case AggregationType::MinAggregate:
-          if(value.IsNull()){
+          if (value.IsNull()) {
             value = input_value;
-          }
-          else {
+          } else {
             value = value.Min(input_value);
           }
           break;
         case AggregationType::MaxAggregate:
-          if(value.IsNull()) {
+          if (value.IsNull()) {
             value = input_value;
-          }
-          else {
+          } else {
             value = value.Max(input_value);
           }
           break;
