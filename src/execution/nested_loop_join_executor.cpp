@@ -91,7 +91,6 @@ void NestedLoopJoinExecutor::Init() {
         for (uint32_t i = 0; i < right_schema.GetColumnCount(); i++) {
           right_values.push_back(ValueFactory::GetNullValueByType(right_schema.GetColumn(i).GetType()));
         }
-
       }
       else if(plan_->GetJoinType() == JoinType::INNER) {
         continue;

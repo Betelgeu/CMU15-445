@@ -12,9 +12,14 @@
 
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
 #include <memory>
+#include <unordered_map>
 #include <utility>
+#include <vector>
 
+#include "aggregation_executor.h"
 #include "execution/executor_context.h"
 #include "execution/executors/abstract_executor.h"
 #include "execution/plans/hash_join_plan.h"
@@ -54,6 +59,12 @@ class HashJoinExecutor : public AbstractExecutor {
  private:
   /** The HashJoin plan node to be executed. */
   const HashJoinPlanNode *plan_;
+
+  std::unique_ptr<AbstractExecutor> left_child_, right_child_;
+  std::unordered_multimap<AggregateKey, Tuple> ht_;
+
+  size_t output_idx_;
+  std::vector<Tuple> output_tuples_;
 };
 
 }  // namespace bustub
