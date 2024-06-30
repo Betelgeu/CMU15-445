@@ -93,7 +93,6 @@ class WindowFunctionPlanNode : public AbstractPlanNode {
 
   /** all columns expressions */
   std::vector<AbstractExpressionRef> columns_;
-
   std::unordered_map<uint32_t, WindowFunction> window_functions_;
 
  protected:

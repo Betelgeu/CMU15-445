@@ -31,7 +31,8 @@ NestedLoopJoinExecutor::NestedLoopJoinExecutor(ExecutorContext *exec_ctx, const 
   }
 }
 
-auto GenerateOutputTuple(std::vector<Value> &left_values, std::vector<Value> &right_values, const Schema *schema) -> Tuple {
+auto GenerateOutputTuple(std::vector<Value> &left_values, std::vector<Value> &right_values, const Schema *schema)
+    -> Tuple {
   std::vector<Value> values;
   values.reserve(left_values.size() + right_values.size());
   values.insert(values.end(), left_values.begin(), left_values.end());
@@ -43,7 +44,7 @@ auto GenerateOutputTuple(std::vector<Value> &left_values, std::vector<Value> &ri
 void NestedLoopJoinExecutor::Init() {
   // 可能需要多次init, 但是只需要聚合计算一次
   output_idx_ = 0;
-  if(!tuples_.empty()) {
+  if (!tuples_.empty()) {
     return;
   }
 
@@ -61,21 +62,20 @@ void NestedLoopJoinExecutor::Init() {
     // values = left_values + right_values
     std::vector<Value> left_values;
     left_values.reserve(plan_->GetLeftPlan()->OutputSchema().GetColumnCount());
-    for(uint32_t i = 0; i < left_schema.GetColumnCount(); i++) {
+    for (uint32_t i = 0; i < left_schema.GetColumnCount(); i++) {
       left_values.push_back(left_tuple.GetValue(&left_schema, i));
     }
 
     right_executor_->Init();
     bool found = false;
     while (right_executor_->Next(&right_tuple, &right_rid)) {
-      auto join_value = plan_->predicate_->EvaluateJoin(&left_tuple, left_schema,
-                                                              &right_tuple, right_schema);
+      auto join_value = plan_->predicate_->EvaluateJoin(&left_tuple, left_schema, &right_tuple, right_schema);
       // 找到符合条件的inner tuple
       if (!join_value.IsNull() && join_value.GetAs<bool>()) {
         found = true;
         std::vector<Value> right_values;
         right_values.reserve(plan_->GetRightPlan()->OutputSchema().GetColumnCount());
-        for(uint32_t i = 0; i < right_schema.GetColumnCount(); i++) {
+        for (uint32_t i = 0; i < right_schema.GetColumnCount(); i++) {
           right_values.push_back(right_tuple.GetValue(&right_schema, i));
         }
         Tuple output_tuple = GenerateOutputTuple(left_values, right_values, &plan_->OutputSchema());
@@ -87,12 +87,11 @@ void NestedLoopJoinExecutor::Init() {
     if (!found) {
       std::vector<Value> right_values;
       right_values.reserve(plan_->GetRightPlan()->OutputSchema().GetColumnCount());
-      if(plan_->GetJoinType() == JoinType::LEFT) {
+      if (plan_->GetJoinType() == JoinType::LEFT) {
         for (uint32_t i = 0; i < right_schema.GetColumnCount(); i++) {
           right_values.push_back(ValueFactory::GetNullValueByType(right_schema.GetColumn(i).GetType()));
         }
-      }
-      else if(plan_->GetJoinType() == JoinType::INNER) {
+      } else if (plan_->GetJoinType() == JoinType::INNER) {
         continue;
       }
       Tuple output_tuple = GenerateOutputTuple(left_values, right_values, &plan_->OutputSchema());

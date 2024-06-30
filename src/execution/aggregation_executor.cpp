@@ -59,7 +59,7 @@ auto AggregationExecutor::Next(Tuple *tuple, RID *rid) -> bool {
 
     // Generate the output tuple
     std::vector<Value> values;
-    values.reserve(GetOutputSchema().GetColumnCount()); // 预留空间
+    values.reserve(GetOutputSchema().GetColumnCount());  // 预留空间
     // values = key + value
     values.insert(values.end(), key.group_bys_.begin(), key.group_bys_.end());
     values.insert(values.end(), value.aggregates_.begin(), value.aggregates_.end());

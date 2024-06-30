@@ -21,15 +21,15 @@ HashJoinExecutor::HashJoinExecutor(ExecutorContext *exec_ctx, const HashJoinPlan
     : AbstractExecutor(exec_ctx),
       plan_(plan),
       left_child_(std::move(left_child)),
-      right_child_(std::move(right_child))
-{
+      right_child_(std::move(right_child)) {
   if (!(plan->GetJoinType() == JoinType::LEFT || plan->GetJoinType() == JoinType::INNER)) {
     // Note for 2023 Fall: You ONLY need to implement left join and inner join.
     throw bustub::NotImplementedException(fmt::format("join type {} not supported", plan->GetJoinType()));
   }
 }
 
-auto MakeAggregateKey(const std::vector<AbstractExpressionRef> &exprs, const Tuple *tuple, const Schema *schema) -> AggregateKey {
+auto MakeAggregateKey(const std::vector<AbstractExpressionRef> &exprs, const Tuple *tuple, const Schema *schema)
+    -> AggregateKey {
   std::vector<Value> vals;
   vals.reserve(exprs.size());
   for (const auto &expr : exprs) {
@@ -38,10 +38,9 @@ auto MakeAggregateKey(const std::vector<AbstractExpressionRef> &exprs, const Tup
   return {vals};
 }
 
-
 void HashJoinExecutor::Init() {
   output_idx_ = 0;
-  if(!output_tuples_.empty()) {
+  if (!output_tuples_.empty()) {
     return;
   }
 
@@ -49,7 +48,7 @@ void HashJoinExecutor::Init() {
   Tuple right_tuple;
   RID right_rid;
   right_child_->Init();
-  while(right_child_->Next(&right_tuple, &right_rid)) {
+  while (right_child_->Next(&right_tuple, &right_rid)) {
     auto key = MakeAggregateKey(plan_->RightJoinKeyExpressions(), &right_tuple, &right_child_->GetOutputSchema());
     ht_.insert({key, right_tuple});
   }
@@ -57,7 +56,7 @@ void HashJoinExecutor::Init() {
   Tuple left_tuple;
   RID left_rid;
   left_child_->Init();
-  while(left_child_->Next(&left_tuple, &left_rid)) {
+  while (left_child_->Next(&left_tuple, &left_rid)) {
     auto key = MakeAggregateKey(plan_->LeftJoinKeyExpressions(), &left_tuple, &left_child_->GetOutputSchema());
     auto range = ht_.equal_range(key);
     std::vector<Tuple> tuples;
@@ -77,7 +76,7 @@ void HashJoinExecutor::Init() {
       tuples.emplace_back(values, &GetOutputSchema());
     }
 
-    if(tuples.empty() && plan_->GetJoinType() == JoinType::LEFT) {
+    if (tuples.empty() && plan_->GetJoinType() == JoinType::LEFT) {
       std::vector<Value> values;
       auto left_size = left_child_->GetOutputSchema().GetColumnCount();
       auto right_size = right_child_->GetOutputSchema().GetColumnCount();

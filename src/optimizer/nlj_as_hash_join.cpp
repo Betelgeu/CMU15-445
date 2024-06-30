@@ -23,24 +23,25 @@ namespace bustub {
 // AND的子节点是AND或==
 // ==的子节点是两个列(叶节点)
 // 将这个二叉树转换为两组列的表达式
-auto Check(const AbstractExpressionRef &expr, std::vector<AbstractExpressionRef> &left_exprs, std::vector<AbstractExpressionRef> &right_exprs) -> bool {
+auto Check(const AbstractExpressionRef &expr, std::vector<AbstractExpressionRef> &left_exprs,
+           std::vector<AbstractExpressionRef> &right_exprs) -> bool {
   bool is_and = true;
   bool is_equal = true;
   try {
     auto &root = dynamic_cast<ComparisonExpression &>(*expr);
-    if(root.comp_type_ != ComparisonType::Equal) {
+    if (root.comp_type_ != ComparisonType::Equal) {
       return false;
     }
 
     auto &left_child_expr = dynamic_cast<ColumnValueExpression &>(*root.GetChildAt(0));
     auto &right_child_expr = dynamic_cast<ColumnValueExpression &>(*root.GetChildAt(1));
-    if(left_child_expr.GetTupleIdx() == 0) {
+    if (left_child_expr.GetTupleIdx() == 0) {
       left_exprs.push_back(std::make_shared<ColumnValueExpression>(left_child_expr));
     } else {
       right_exprs.push_back(std::make_shared<ColumnValueExpression>(left_child_expr));
     }
 
-    if(right_child_expr.GetTupleIdx() == 0) {
+    if (right_child_expr.GetTupleIdx() == 0) {
       left_exprs.push_back(std::make_shared<ColumnValueExpression>(right_child_expr));
     } else {
       right_exprs.push_back(std::make_shared<ColumnValueExpression>(right_child_expr));
@@ -52,12 +53,12 @@ auto Check(const AbstractExpressionRef &expr, std::vector<AbstractExpressionRef>
 
   try {
     auto &root = dynamic_cast<LogicExpression &>(*expr);
-    if(root.logic_type_ != LogicType::And) {
+    if (root.logic_type_ != LogicType::And) {
       return false;
     }
     auto &left_child_expr = root.GetChildAt(0);
     auto &right_child_expr = root.GetChildAt(1);
-    if(Check(left_child_expr, left_exprs, right_exprs) && Check(right_child_expr, left_exprs, right_exprs)) {
+    if (Check(left_child_expr, left_exprs, right_exprs) && Check(right_child_expr, left_exprs, right_exprs)) {
       return true;
     }
   } catch (const std::bad_cast &) {
@@ -79,21 +80,15 @@ auto Optimizer::OptimizeNLJAsHashJoin(const AbstractPlanNodeRef &plan) -> Abstra
   }
   auto optimized_plan = plan->CloneWithChildren(std::move(children));
 
-  if(optimized_plan->GetType() == PlanType::NestedLoopJoin) {
+  if (optimized_plan->GetType() == PlanType::NestedLoopJoin) {
     const auto &nlj_plan = dynamic_cast<const NestedLoopJoinPlanNode &>(*optimized_plan);
     // Has exactly two children
     BUSTUB_ENSURE(nlj_plan.children_.size() == 2, "NLJ should have exactly 2 children.");
     std::vector<AbstractExpressionRef> left_exprs;
     std::vector<AbstractExpressionRef> right_exprs;
-    if(Check(nlj_plan.predicate_, left_exprs, right_exprs)) {
-      return std::make_shared<HashJoinPlanNode>(
-        nlj_plan.output_schema_,
-        nlj_plan.children_[0],
-        nlj_plan.children_[1],
-        left_exprs,
-        right_exprs,
-        nlj_plan.join_type_
-      );
+    if (Check(nlj_plan.predicate_, left_exprs, right_exprs)) {
+      return std::make_shared<HashJoinPlanNode>(nlj_plan.output_schema_, nlj_plan.children_[0], nlj_plan.children_[1],
+                                                left_exprs, right_exprs, nlj_plan.join_type_);
     }
   }
 
