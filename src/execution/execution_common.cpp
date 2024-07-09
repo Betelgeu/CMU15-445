@@ -1,4 +1,5 @@
 #include "execution/execution_common.h"
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include "catalog/catalog.h"
@@ -60,16 +61,76 @@ auto ReconstructTuple(const Schema *schema, const Tuple &base_tuple, const Tuple
   return std::nullopt;
 }
 
+void PrintUndoLog(const UndoLog &undo_log, const Schema *schema) {
+  if(undo_log.is_deleted_) {
+    fmt::print("<del>");
+  } else {
+    uint32_t col_len = schema->GetColumnCount();
+    std::vector<uint32_t> attrs;
+    for(uint32_t i = 0; i < col_len; i++) {
+      if(undo_log.modified_fields_[i]) {
+        attrs.push_back(i);
+      }
+    }
+    Schema partial_schema = Schema::CopySchema(schema, attrs);
+    fmt::print("(");
+    for(uint32_t i = 0, j = 0; i < col_len; i++) {
+      if(undo_log.modified_fields_[i]) {
+        auto value = undo_log.tuple_.GetValue(&partial_schema, j++);
+        if(value.IsNull()) {
+          fmt::print("<NULL>");
+        }
+        else {
+          fmt::print("{}", value.ToString());
+        }
+      }
+      else {
+        fmt::print("_");
+      }
+
+      if(i != col_len - 1) {
+        fmt::print(", ");
+      }
+    }
+    fmt::print(")");
+  }
+}
+
 void TxnMgrDbg(const std::string &info, TransactionManager *txn_mgr, const TableInfo *table_info,
                TableHeap *table_heap) {
   // always use stderr for printing logs...
   fmt::println(stderr, "debug_hook: {}", info);
 
-  fmt::println(
-      stderr,
-      "You see this line of text because you have not implemented `TxnMgrDbg`. You should do this once you have "
-      "finished task 2. Implementing this helper function will save you a lot of time for debugging in later tasks.");
+  auto table_iter = std::make_unique<TableIterator>(table_heap->MakeIterator());
+  auto schema = table_info->schema_;
+  while(!table_iter->IsEnd()) {
+    // print base tuple
+    auto [base_meta, base_tuple] = table_iter->GetTuple();
+    auto rid = table_iter->GetRID();
+    fmt::print(stderr, "RID={}/{} ", rid.GetPageId(), rid.GetSlotNum());
+    if(base_meta.ts_ < TXN_START_ID) {
+      fmt::print(stderr, "ts={} ", base_meta.ts_);
+    }
+    else {
+      fmt::print(stderr, "ts=txn{} ", base_meta.ts_ - TXN_START_ID);
+    }
 
+    if(base_meta.is_deleted_) {
+      fmt::print(stderr, "<del marker> ");
+    }
+    fmt::print(stderr, "tuple={}\n", base_tuple.ToString(&schema));
+    // print whole version chain
+    auto undo_link = txn_mgr->GetUndoLink(rid).value();
+    while(undo_link.IsValid()) {
+      auto undo_log = txn_mgr->GetUndoLog(undo_link);
+      fmt::print(stderr, "  txn{}@{} ", undo_link.prev_txn_ - TXN_START_ID, undo_link.prev_log_idx_);
+      PrintUndoLog(undo_log, &schema);
+      fmt::print(stderr, " ts={}\n", undo_log.ts_);
+
+      undo_link = undo_log.prev_version_;
+    }
+    ++(*table_iter);
+  }
   // We recommend implementing this function as traversing the table heap and print the version chain. An example output
   // of our reference solution:
   //
