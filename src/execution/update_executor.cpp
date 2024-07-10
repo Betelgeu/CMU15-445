@@ -13,6 +13,9 @@
 #include <memory>
 
 #include "execution/executors/update_executor.h"
+#include "execution/execution_common.h"
+#include "concurrency/transaction_manager.h"
+#include "execution/expressions/column_value_expression.h"
 
 namespace bustub {
 
@@ -42,28 +45,61 @@ auto CompareKey(Tuple &key1, Tuple &key2, Schema &key_schema) -> bool {
 }
 
 auto UpdateExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
-  Tuple temp_tuple;
-  RID temp_rid;
+
+  Tuple base_tuple;
+  RID base_rid;
   int size = 0;
-  while (child_executor_->Next(&temp_tuple, &temp_rid)) {
-    // update to table heap
-    auto &table = table_info_->table_;
-    // 1. delete
-    table->UpdateTupleMeta({0, true}, temp_rid);
-    // 2. update && insert
+  auto &table = table_info_->table_;
+  auto txn = exec_ctx_->GetTransaction();
+  auto txn_manager = exec_ctx_->GetTransactionManager();
+  auto read_ts = txn->GetReadTs();
+  auto schema = table_info_->schema_;
+
+  while (child_executor_->Next(&base_tuple, &base_rid)) {
     std::vector<Value> values;
     for (uint32_t i = 0; i < table_info_->schema_.GetColumnCount(); i++) {
-      auto new_value = plan_->target_expressions_[i]->Evaluate(&temp_tuple, table_info_->schema_);
+      auto new_value = plan_->target_expressions_[i]->Evaluate(&base_tuple, table_info_->schema_);
       values.emplace_back(new_value);
     }
     auto new_tuple = Tuple(values, &table_info_->schema_);
-    auto rid_opt = table->InsertTuple({0, false}, new_tuple);
-    if (!rid_opt.has_value()) {
-      throw Exception("Insert failed");
+    const auto & [old_meta, old_tuple] = table->GetTuple(base_rid);
+    auto ts = old_meta.ts_;
+    auto modified_field = GetModifiedField(new_tuple, old_tuple, &schema);
+    //check MVCC write conflict
+    if (ts == txn->GetTransactionId()) {
+      table->UpdateTupleInPlace({txn->GetTransactionId(), false}, new_tuple, base_rid);
+      // 如果存在undo log, 需要将其覆盖更新
+      if(txn_manager->GetUndoLink(base_rid).has_value()) {
+        auto undo_link = txn_manager->GetUndoLink(base_rid).value();
+        auto old_undo_log = txn_manager->GetUndoLog(undo_link);
+        auto delta_tuple = DeltaTuple(base_tuple, &schema, modified_field);
+        UndoLog new_undo_log = CoverUndoLog(delta_tuple, &schema, modified_field, old_undo_log);
+        txn->ModifyUndoLog(undo_link.prev_log_idx_, new_undo_log);
+      }
     }
-    size++;
-    auto new_rid = rid_opt.value();
+    else if (read_ts < ts) {
+      txn->SetTainted();
+      throw ExecutionException("update: MVCC write-write conflict");
+    }
+    else {
+      // 创建undo log, 更新版本链
+      auto base_meta = table->GetTupleMeta(base_rid);
+      UndoLink old_undo_link;
+      if(txn_manager->GetUndoLink(base_rid).has_value()) {
+        old_undo_link = txn_manager->GetUndoLink(base_rid).value();
+      }
+      UndoLink new_undo_link = {txn->GetTransactionId(), static_cast<int>(txn->GetUndoLogNum())};
+      auto delta_tuple = DeltaTuple(base_tuple, &schema, modified_field);
+      UndoLog new_undo_log = {base_meta.is_deleted_, modified_field, delta_tuple, base_meta.ts_, old_undo_link};
+      txn->AppendUndoLog(new_undo_log);
+      txn_manager->UpdateUndoLink(base_rid, new_undo_link);
 
+      //update in place
+      table->UpdateTupleInPlace({txn->GetTransactionId(), false}, new_tuple, base_rid);
+    }
+
+    txn->AppendWriteSet(plan_->table_oid_, base_rid);
+    size++;
     // update index
     // 只更新改变列上的index
     auto table_name = table_info_->name_;
@@ -72,13 +108,13 @@ auto UpdateExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
       auto new_key =
           new_tuple.KeyFromTuple(table_info_->schema_, index_info->key_schema_, index_info->index_->GetKeyAttrs());
       auto old_key =
-          temp_tuple.KeyFromTuple(table_info_->schema_, index_info->key_schema_, index_info->index_->GetKeyAttrs());
+          base_tuple.KeyFromTuple(table_info_->schema_, index_info->key_schema_, index_info->index_->GetKeyAttrs());
       // key没有改变，则不需要更新
       if (CompareKey(new_key, old_key, index_info->key_schema_)) {
         continue;
       }
-      index_info->index_->DeleteEntry(old_key, temp_rid, exec_ctx_->GetTransaction());
-      index_info->index_->InsertEntry(new_key, new_rid, exec_ctx_->GetTransaction());
+      index_info->index_->DeleteEntry(old_key, base_rid, exec_ctx_->GetTransaction());
+      index_info->index_->InsertEntry(new_key, base_rid, exec_ctx_->GetTransaction());
     }
   }
   // output size tuple

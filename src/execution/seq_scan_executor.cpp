@@ -37,21 +37,27 @@ auto SeqScanExecutor::Next(Tuple *tuple, RID *rid) -> bool {
     auto temp_rid = table_iter_->GetRID();
 
     // MVCC
-    auto undo_link = exec_ctx_->GetTransactionManager()->GetUndoLink(temp_rid).value();
-    auto read_ts = exec_ctx_->GetTransaction()->GetReadTs();
-    auto ts = temp_meta.ts_;
+    auto txn = exec_ctx_->GetTransaction();
+    auto txn_manager = exec_ctx_->GetTransactionManager();
+    auto undo_link_opt = txn_manager->GetUndoLink(temp_rid);
     std::vector<UndoLog> undo_logs;
-    while(read_ts < ts && undo_link.IsValid()) {
-      if(ts == exec_ctx_->GetTransaction()->GetTransactionId()) {
-        break;
+    auto read_ts = txn->GetReadTs();
+    auto ts = temp_meta.ts_;
+    if(undo_link_opt.has_value()) {
+      auto undo_link = txn_manager->GetUndoLink(temp_rid).value();
+      while(read_ts < ts && undo_link.IsValid()) {
+        if(ts == txn->GetTransactionId()) {
+          break;
+        }
+        auto undo_log = txn_manager->GetUndoLog(undo_link);
+        undo_logs.push_back(undo_log);
+        undo_link = undo_log.prev_version_;
+        ts = undo_log.ts_;
       }
-      auto undo_log = exec_ctx_->GetTransactionManager()->GetUndoLog(undo_link);
-      undo_logs.push_back(undo_log);
-      undo_link = undo_log.prev_version_;
-      ts = undo_log.ts_;
     }
     auto tuple_opt = ReconstructTuple(&plan_->OutputSchema(), temp_tuple, temp_meta, undo_logs);
-    if(read_ts < ts || !tuple_opt.has_value()) {
+    status &= (ts == txn->GetTransactionId() || read_ts >= ts) && tuple_opt.has_value();
+    if(!status) {
       ++(*table_iter_);
       continue;
     }

@@ -34,4 +34,10 @@ void TxnMgrDbg(const std::string &info, TransactionManager *txn_mgr, const Table
 // your implementation. Please add your own ones as necessary so that you do not need to write
 // the same code everywhere.
 
+auto DeltaTuple(const Tuple &base_tuple, Schema *schema, const std::vector<bool>& modified_fields) -> Tuple;
+
+auto CoverUndoLog(const Tuple &delta_tuple, const Schema *table_schema, const std::vector<bool>& modified_fields, const UndoLog &undo_log) -> UndoLog;
+
+auto GetModifiedField(const Tuple & new_tuple, const Tuple &old_tuple, const Schema *table_schema) -> std::vector<bool>;
+
 }  // namespace bustub

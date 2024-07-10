@@ -13,6 +13,7 @@
 #include <memory>
 
 #include "execution/executors/insert_executor.h"
+#include "concurrency/transaction_manager.h"
 
 namespace bustub {
 
@@ -40,10 +41,13 @@ auto InsertExecutor::Next([[maybe_unused]] Tuple *tuple, RID *rid) -> bool {
     // insert_rid在InsertTuple后生成
 
     // insert to table heap
-    TupleMeta meta = {0, false};
+    TupleMeta meta = {exec_ctx_->GetTransaction()->GetTransactionId(), false};
     auto rid_opt = insert_table->InsertTuple(meta, insert_tuple);
     if (rid_opt.has_value()) {
       insert_rid = rid_opt.value();
+      exec_ctx_->GetTransactionManager()->UpdateUndoLink(rid_opt.value(), std::nullopt);
+      auto txn = exec_ctx_->GetTransaction();
+      txn->AppendWriteSet(insert_table_id_, insert_rid);
       size++;
     } else {
       throw Exception("Insert failed");
